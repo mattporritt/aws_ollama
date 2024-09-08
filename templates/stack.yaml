@@ -177,7 +177,7 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1  # Defines the root volume device for Ubuntu.
           Ebs:
-            VolumeSize: 50  # Root volume size in GB (50 GB in this case).
+            VolumeSize: 250  # Root volume size in GB (250 GB in this case).
             VolumeType: gp3  # General Purpose SSD.
             DeleteOnTermination: true  # Delete the EBS volume when the instance is terminated.
       UserData:

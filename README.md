@@ -101,7 +101,7 @@ The command will output various pieces of information including about
 the created stack, including the command to SSH into the created instance.
 The web address of the Ollama instance will also be output.
 
-#### Example Output
+#### Build Output
 
 After running the command, you will see output similar to the following, showing the key pair creation,
 stack creation progress, and useful connection details:
@@ -118,6 +118,13 @@ PublicIP: 13.211.140.24
 SSH command: ssh -i ./test-ollama-2024090816-keypair.pem ubuntu@13.211.140.24
 Web address: https://test-ollama.yourdomain.com
 ```
+**NOTE:** The stack creation process can take several minutes to complete, and some setup tasks may
+continue on the EC2 instance after the stack is marked as complete.
+Examining the creation log once ssh'd into the instance is recommended and will provide status of the final
+set up steps.
+```bash
+tail -f /var/log/user-data.log
+```
 
 ### Basic Authentication
 The Ollama instance is protected by basic authentication.
@@ -133,3 +140,10 @@ time curl -v -u username:password -X POST https://test-ollama.yourdomain.com/api
   "system": "prefix all responses with the words: TEST TEST TEST"
  }'
 ```
+
+## SSH Access
+To SSH into the instance, use the command provided in the output:
+```bash
+ssh -i ./test-ollama-2024090816-keypair.pem ubuntu@13.211.140.24
+```
+Once connected, you can access the Ollama instance and install additional models or make changes as needed.

@@ -118,5 +118,5 @@ systemctl status ollama
 
 # Install Ollama models
 echo "Starting step install models" >> /var/log/user-data.log
-ollama pull mistral
-ollama pull llama3.1:8b
+su - ubuntu -c "ollama pull mistral"
+su - ubuntu -c "ollama pull llama3.1:8b"
