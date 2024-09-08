@@ -1,0 +1,241 @@
+# ==============================================================================
+#
+# This file is part of aws_ollama.
+#
+# aws_ollama is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# aws_ollama is distributed WITHOUT ANY WARRANTY:
+# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+# ==============================================================================
+
+# ==============================================================================
+#
+# @author Matthew Porritt
+# @copyright  2024 onwards Matthew Porritt (matt.porritt@moodle.com)
+# @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+# ==============================================================================
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an EC2 instance running Nginx in a new VPC with SSL and SSH access. The instance will be configured with basic authentication and SSL using Let's Encrypt.
+
+# ========================
+# Parameters Section
+# ========================
+# These parameters allow you to input values when deploying the stack.
+
+Parameters:
+  HostedZoneId:
+    Type: String
+    Description: The ID of the hosted zone where the subdomain will be created.
+  HostedZoneName:
+    Type: String
+    Description: The DNS name of the hosted zone.
+  SubdomainName:
+    Type: String
+    Description: The subdomain to create (e.g., 'www' to create 'www.example.com').
+  InstanceType:
+    Description: EC2 instance type (e.g., t2.micro, g4dn.xlarge).
+    Type: String
+    Default: g4dn.xlarge  # Default instance type is g4dn.xlarge.
+  KeyPairName:
+    Description: The name of an existing EC2 KeyPair to enable SSH access.
+    Type: AWS::EC2::KeyPair::KeyName
+  BasicAuthUser:
+    Description: The username for basic authentication to secure the Nginx service.
+    Type: String
+    Default: admin
+  BasicAuthPassword:
+    Description: The password for basic authentication (hidden in output).
+    Type: String
+    NoEcho: true  # Prevents the password from being displayed in CloudFormation logs.
+  Region:
+    Description: AWS Region where the resources will be deployed.
+    Type: String
+    Default: ap-southeast-2  # Default region set to ap-southeast-2 (Sydney).
+    AllowedValues:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+      - ap-southeast-2
+    ConstraintDescription: Must be a valid AWS region.
+
+# ========================
+# Mappings Section
+# ========================
+# RegionMap: This section maps AWS regions to specific Amazon Machine Image (AMI) IDs.
+# Each AMI is tied to a specific region for creating the EC2 instance.
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0e86e20dae9224db8
+    us-west-2:
+      AMI: ami-05134c8ef96964280
+    eu-west-1:
+      AMI: ami-0d53d72369335a9d6
+    ap-southeast-2:
+      AMI: ami-0892a9c01908fafd1  # Ubuntu AMI for the Sydney region.
+
+# ========================
+# Resources Section
+# ========================
+# This section defines the AWS resources created by the stack.
+
+Resources:
+  # VPC Resource: Creates a new Virtual Private Cloud (VPC).
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16  # The CIDR block defines the IP range for the VPC.
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: TestVPC  # The name tag for the VPC.
+
+  # Internet Gateway Resource: Allows the VPC to communicate with the internet.
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  # Attach the Internet Gateway to the VPC.
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC  # Attach the gateway to the VPC created earlier.
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnet Resource: Defines a subnet within the VPC.
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC  # Attach the subnet to the VPC.
+      CidrBlock: 10.0.1.0/24  # Subnet's IP range within the VPC.
+      MapPublicIpOnLaunch: true  # Automatically assign a public IP to instances launched in this subnet.
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]  # Select the first availability zone.
+      Tags:
+        - Key: Name
+          Value: PublicSubnet  # Name tag for the subnet.
+
+  # Route Table Resource: Allows routing of network traffic within the VPC.
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  # Public Route Resource: Defines a route for internet traffic to the VPC.
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0  # Route all traffic to the internet.
+      GatewayId: !Ref InternetGateway  # Route through the internet gateway.
+
+  # Associate the public route table with the public subnet.
+  RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  # Security Group Resource: Defines firewall rules for the EC2 instance.
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH, HTTP, and HTTPS access.
+      VpcId: !Ref VPC  # Attach the security group to the VPC.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22  # Allow SSH access on port 22 from any IP.
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80  # Allow HTTP access on port 80 from any IP.
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443  # Allow HTTPS access on port 443 from any IP.
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  # EC2 Instance Resource: Creates an EC2 instance running Ubuntu, Nginx, and SSL.
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType  # Use the instance type defined in the parameters.
+      KeyName: !Ref KeyPairName  # Use the SSH key pair for remote access.
+      SubnetId: !Ref PublicSubnet  # Launch the instance in the public subnet.
+      SecurityGroupIds:
+        - !Ref SecurityGroup  # Attach the security group created earlier.
+      ImageId: !FindInMap [ RegionMap, !Ref Region, AMI ]  # Use the AMI based on the region.
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1  # Defines the root volume device for Ubuntu.
+          Ebs:
+            VolumeSize: 50  # Root volume size in GB (50 GB in this case).
+            VolumeType: gp3  # General Purpose SSD.
+            DeleteOnTermination: true  # Delete the EBS volume when the instance is terminated.
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo -i
+          apt update -y > /var/log/user-data.log 2>&1
+          apt install -y curl cloud-init >> /var/log/user-data.log 2>&1
+          
+          # Download the setup script from GitHub
+          curl -o /tmp/setup-ollama-nginx.sh https://raw.githubusercontent.com/mattporritt/aws_ollama/main/scripts/setup-ollama-nginx.sh >> /var/log/user-data.log 2>&1
+          chmod +x /tmp/setup-ollama-nginx.sh >> /var/log/user-data.log 2>&1
+          
+          # Run the setup script and capture the exit code
+          /tmp/setup-ollama-nginx.sh ${SubdomainName} ${HostedZoneName} ${BasicAuthUser} ${BasicAuthPassword} >> /var/log/user-data.log 2>&1
+          EXIT_CODE=$?
+          sleep 30
+          
+          # If the script succeeded, signal success
+          if [ $EXIT_CODE -eq 0 ]; then
+            /opt/aws/bin/cfn-signal --exit-code 0 --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+          else
+            # Signal failure to CloudFormation and exit
+            /opt/aws/bin/cfn-signal --exit-code 1 --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+            exit 1
+
+  # Subdomain DNS Record: Creates a Route 53 DNS 'A' record to map the subdomain to the EC2 instance's public IP.
+  SubdomainRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId  # Use the hosted zone provided in the parameters.
+      Name: !Sub "${SubdomainName}.${HostedZoneName}"  # Fully qualified domain name (e.g., www.example.com).
+      Type: A  # Define an A record to point the subdomain to an IP.
+      TTL: 60  # Time to live for the DNS record (60 seconds).
+      ResourceRecords:
+        - !GetAtt EC2Instance.PublicIp  # Associate the DNS record with the EC2 instance's public IP.
+
+# ========================
+# Outputs Section
+# ========================
+# This section outputs useful information after the stack is created.
+
+Outputs:
+  InstanceId:
+    Description: The EC2 Instance ID
+    Value: !Ref EC2Instance
+    Export:
+      Name: InstanceId
+  PublicIP:
+    Description: The public IP of the EC2 instance
+    Value: !GetAtt EC2Instance.PublicIp
+    Export:
+      Name: InstancePublicIP
+  SSHKeyPairName:
+    Description: SSH Key Pair Name
+    Value: !Ref KeyPairName
+    Export:
+      Name: KeyPairName
+  RegionOutput:
+    Description: The region where resources are deployed
+    Value: !Ref Region
