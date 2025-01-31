@@ -65,6 +65,10 @@ Parameters:
       - eu-west-1
       - ap-southeast-2
     ConstraintDescription: Must be a valid AWS region.
+  DiskSize:
+    Description: EBS volume size for Ollama models (in GB).
+    Type: Number
+    Default: 500 # Default disk size set to 500 GB.
 
 # ========================
 # Mappings Section
@@ -177,7 +181,7 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1  # Defines the root volume device for Ubuntu.
           Ebs:
-            VolumeSize: 250  # Root volume size in GB (250 GB in this case).
+            VolumeSize: !Ref DiskSize  # Root volume size in GB.
             VolumeType: gp3  # General Purpose SSD.
             DeleteOnTermination: true  # Delete the EBS volume when the instance is terminated.
       UserData:

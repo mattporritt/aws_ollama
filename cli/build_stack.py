@@ -115,6 +115,7 @@ def main():
     parser.add_argument('--region', required=True, help='AWS Region')
     parser.add_argument('--stack_name', required=True, help='Name of the CloudFormation Stack')
     parser.add_argument('--instance_type', required=True, help='Instance type for the EC2 instance')
+    parser.add_argument('--disk-size', type=int, default=500, help='Disk size for Ollama models in GB (default: 500).')
     parser.add_argument('--hosted_zone_id', required=True, help='Hosted Zone ID for the website')
     parser.add_argument('--hosted_zone_name', required=True, help='Hosted Zone Name for the website')
     parser.add_argument('--basic_auth_username', required=True, help='Basic Auth username')
@@ -153,7 +154,8 @@ def main():
         {'ParameterKey': 'KeyPairName', 'ParameterValue': created_keypair_name},
         {'ParameterKey': 'SubdomainName', 'ParameterValue': args.stack_name},  # Use stack name as subdomain.
         {'ParameterKey': 'BasicAuthUser', 'ParameterValue': args.basic_auth_username},
-        {'ParameterKey': 'BasicAuthPassword', 'ParameterValue': args.basic_auth_password}
+        {'ParameterKey': 'BasicAuthPassword', 'ParameterValue': args.basic_auth_password},
+        {'ParameterKey': 'DiskSize', 'ParameterValue': str(args.disk_size)}
     ]
 
     # Deploy the CloudFormation stack using the template and parameters.

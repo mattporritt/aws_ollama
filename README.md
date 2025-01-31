@@ -6,9 +6,11 @@ and the Ollama API in a controlled environment.
 **Note:** This project is intended for testing purposes only and is NOT suitable for production use.
 
 ## Install Models
-The project will install the following models on the Ollama instance:
+The project will install the following models automatically on the Ollama instance:
 * mistral
 * llama3.1:8b
+
+Other models can be installed manually by SSH'ing into the instance.
 
 ## Prerequisites
 
@@ -71,6 +73,7 @@ python3 cli/build_stack.py \
 --region ap-southeast-2 \
 --stack_name test-ollama \
 --instance_type t2.micro \
+--disk_size 500 \
 --hosted_zone_id Z06443053GNXEEQBFY3MD \
 --hosted_zone_name yourdomain.com \
 --keypair_name MyGeneratedKeyPair \
@@ -90,6 +93,7 @@ Command Details:
 * **--region:** The AWS region to deploy the stack (e.g., ap-southeast-2 for Sydney).
 * **--stack_name:** The name of the CloudFormation stack (e.g., test-ollama).
 * **--instance_type:** The type of EC2 instance to launch (e.g., t2.micro).
+* **--disk_size:** The size of the EBS volume in GB (e.g., 500).
 * **--hosted_zone_id:** The Hosted Zone ID from Route 53.
 * **--hosted_zone_name:** Your domain name (e.g., yourdomain.com).
 * **--keypair_name:** The name of the EC2 key pair for SSH access (optional; if not provided, one will be generated).
@@ -147,3 +151,19 @@ To SSH into the instance, use the command provided in the output:
 ssh -i ./test-ollama-2024090816-keypair.pem ubuntu@13.211.140.24
 ```
 Once connected, you can access the Ollama instance and install additional models or make changes as needed.
+
+## Install Additional Models
+To install additional models, SSH into the instance and run the following command:
+```bash
+ollama pull <model_name>
+```
+For example, to install the `deepseek-r1:671b` model:
+```bash
+ollama pull deepseek-r1:671b
+```
+Then to run the model:
+```bash
+ollama run deepseek-r1:671b
+```
+Please note if you want to install large models, you may need to increase the disk size of the instance.
+Also large models will take some time to download and install.
